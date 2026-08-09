@@ -12,7 +12,7 @@ INLINE_ALLOWED_IDS = [
 ]   # Список ID пользователей, которым разрешено использовать инлайн-режим бота (оставьте пустым для разрешения всем)
 
 # ── MRKT API ──
-MRKT_API_URL = "https://api.tgmrkt.io/api/v1"
+MRKT_API_URL = "https://getgems-production.up.railway.app"
 
 # ── Telegram API (для получения init_data через Telethon/Pyrogram) ──
 API_ID = 35656974 
