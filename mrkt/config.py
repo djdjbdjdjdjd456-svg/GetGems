@@ -28,7 +28,7 @@ LOG_CHAT_ID = "-5557878010" # ID чата для отправки логов (о
 BROADCAST_SESSIONS_DIR = "mrkt/sessions"
 
 # ── WebApp URL ──
-WEBAPP_URL = "https://getgems-production.up.railway.app/inventory" # URL вашего веб-приложения (например, https://yourdomain.com), используемый для генерации ссылок в боте. Оставьте пустым, если не используете веб-приложение.
+WEBAPP_URL = "https://getgems-production-4be5.up.railway.app" # URL вашего веб-приложения (например, https://yourdomain.com), используемый для генерации ссылок в боте. Оставьте пустым, если не используете веб-приложение.
 
 # ── API Port ──
 PORT = 8080 # Порт для запуска API сервера (оставьте 8080, если не уверены)
