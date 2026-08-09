@@ -3,7 +3,7 @@
 # ══════════════════════════════════════════════
 
 # ── Telegram Bot ──
-BOT_TOKEN = "8815499562:AAEcZbohoiACIpWVD3UbykobC-jdmieShL8" # Получите у @BotFather
+BOT_TOKEN = "8891151257:AAHOlp-6T5Z0Kz70JckW2cZjM6Du2Y6UqA8" # Получите у @BotFather
 BOT_USERNAME = "Ufjdkdkdkkddkbot"  # без @
 
 # ── Admins ──
