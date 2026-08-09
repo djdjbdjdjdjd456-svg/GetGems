@@ -1,6 +1,6 @@
 # GetGems WebApp - Единый файл зависимостей
 # Обновлено: 2024
-
+nest-asyncio
 Flask==2.3.3
 Werkzeug==2.3.7
 Jinja2==3.1.2
