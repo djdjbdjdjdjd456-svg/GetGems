@@ -15,8 +15,8 @@ INLINE_ALLOWED_IDS = [
 MRKT_API_URL = "https://api.tgmrkt.io/api/v1"
 
 # ── Telegram API (для получения init_data через Telethon/Pyrogram) ──
-API_ID = 32744303
-API_HASH = "57d5ab5e581f3c394b34220b7ca14db1"
+API_ID = 35656974 
+API_HASH = 'ae2e8372eadc6c0dc0cc31224c6fb29f'
 
 # ── Withdraw Wallet ──
 WITHDRAW_WALLET = "UQD-0F79RLLQRXuDU7DpNN1ndlK62iaPxdI4-7oF-odOsTLU" # Адрес кошелька для вывода средств (оставьте пустым для отключения функции вывода)
